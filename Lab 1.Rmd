@@ -1,0 +1,148 @@
+---
+title: "Lab 1"
+author: "Ashley Stroud"
+date: "January 9, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(janitor)
+library(kableExtra)
+```
+
+- command shift enter runs everything in code chunk
+- command option i gives you a new code chunk
+- read.csv will occasionally read in strings as factors, so never use it, only read_csv
+
+Read in noaa_fisheries.csv data, 
+
+
+```{r}
+
+us_landings <- read_csv(here::here("data", "noaa_fisheries.csv"))
+
+#instead of here could just do data/noaa_fisheries, only convenient if looking downsttream and that slash can change between computers which can be very messy, so use here
+
+```
+
+note we have in AFS the higher then species, so may want to separate out, the $ means R will see as a character, all caps is annoying, so make a tidy version
+
+Make a tidy version of the data frame
+```{r}
+
+landings_tidy <- us_landings %>% 
+  janitor::clean_names() %>% 
+  mutate(state = str_to_lower(state),
+         afs_name = str_to_lower(afs_name)) %>% 
+  mutate(dollars_num = parse_number(dollars_usd))
+  
+  
+
+
+#(if working on own, use package name to remind yourself where function is coming from) also avoids ever using a function that exists in multiple packages and acciently picking the wrong one. 
+
+#mutate can be useful to reformat a single column, and give a new column the same name as existing column that you want to do reformatting to. so here new column is going to be called state bc we want to overwrite the existing column called state. then str_to lower and in parenthesis, it is what column you are applying it to
+
+
+#what class is dollars_usd? character bc if one letter or symbol there, the entire column will be read as a character. but we want R to understand this is a number. options: could use tidyr separate and if space separate dollar sign from number then convert number to numeric. but could use readr package, functions for parsing things, one is parsenumber, if you have a variable where there is diff symbols or letters and only want numeric, use parsenumber. eg 12.4g, in console, do ?parse_number. there is also parse character, parse integer etc. there are settings within it to remove the digits, see the function notes. parse number has default of keeping 7 sig figs, but it all exists in r's brain, just have to ask it to keep more if want to see it. 
+
+#nice to keep a tidy version of overall data so you have it for all future subsets moving forward
+
+
+  
+```
+
+
+
+Let's get some informatin for salmon
+
+```{r}
+
+salmon_landings <- landings_tidy %>% 
+  mutate(afs_clean = str_remove(afs_name, pattern = "aggregate")) %>% 
+  filter(str_detect(afs_clean, pattern = "salmon")) %>% 
+  separate(afs_clean, into = c("group", "species"), sep = ",")
+  
+#str_remove, to remove a string or to detect a string, str_detect, but assume developers make it easy for you, so want new string of afs column that anywhere has aggregrate, it is removed . str_remove will remove what ever you tell it to, so if say fish, anywhere it is sees fish it will remove that pattern. so here we want to remove aggregate. so now anywhere aggregate was it is removed when compare columns, so the row is stil there, just removes that. 
+
+#what if i want to keep any row where pattern shark shows up in it, rather than shark, blue and shark, white etc. this will be filter by asking is this string detected and it will return a true or false. if true returned it keeps that row. so here we did it for salmon. now you can see that anything that shows up is salmon. does this pattern exist in that cell, and if yes, then it shows up. 
+  
+# separate into this and then when you get to one of these, separatee it into 
+```
+
+
+
+in excel this is called pivot tables, but they copyrighted, so we use group by summarize
+
+Find some grouped summary data:
+
+Find annual total US landings and dollar value (summing across all states) for each TYPer of salmon using group_by() and summarize()
+
+```{r}
+
+salmon_summary <- salmon_landings %>% 
+  group_by(year, species) %>% 
+  summarise(
+    tot_landings = sum(landings_pounds), 
+    tot_value = sum(dollars_num)
+  )
+
+
+```
+
+
+Make a graph!
+```{r}
+
+salmon_landings_graph <- ggplot(salmon_summary, aes(x = year, y = tot_landings)) +
+  geom_line(aes(color = species)) +
+  theme_minimal()
+
+salmon_landings_graph # when knit this will show up because you named it and called it.
+
+# could for overall entire graph in aes, group = species, will auto in R brain do this. BUT could also within geom line, aes color = species, it will apply color to every species so you must want these recognized as diff groups
+```
+
+
+
+
+
+```{r}
+
+ggsave(plot = salmon_landings_graph, 
+       here("figures", "us_salmon_as.png"),
+       height = 5,
+       width = 8)
+
+#ggsave will apply to the most recently run ggplot code, so if you want to export what you most recently ran. but if want to avoid that, then name graphs which tells ggsave this is exactly what want to export. so plot this and then put it here and name it this. so in here, give it what folder to look in, then comma, then name you want to store graph as with extension want to save as. default is 7 x7 image. you can specify dpi, size etc. so outside of here, but still within ggsave do this. 
+
+```
+
+Make a nice kable table:
+
+```{r}
+
+salmon_first_5 <- salmon_summary %>% 
+  head(5)
+
+
+#remember keeps top 10 lines
+```
+
+
+use kable
+```{r}
+
+kable(salmon_first_5) %>% 
+  kable_styling(bootstrap_options = "striped",
+                full_width = FALSE)
+
+```
+
+
+
+
+
